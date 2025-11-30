@@ -1,0 +1,37 @@
+[mysqld]
+# Production MySQL configuration
+default_authentication_plugin = mysql_native_password
+
+# Performance tuning
+max_connections = 500
+innodb_buffer_pool_size = 1G
+innodb_log_file_size = 256M
+innodb_flush_method = O_DIRECT
+innodb_flush_log_at_trx_commit = 2
+
+# Query cache (if needed)
+query_cache_type = 1
+query_cache_size = 64M
+query_cache_limit = 2M
+
+# Logging (disable general log in production)
+general_log = 0
+slow_query_log = 1
+slow_query_log_file = /var/lib/mysql/slow.log
+long_query_time = 2
+
+# Connection settings
+wait_timeout = 28800
+interactive_timeout = 28800
+max_allowed_packet = 64M
+
+# Character set
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+# Binary logging for replication/backup
+server-id = 1
+log_bin = /var/lib/mysql/mysql-bin.log
+binlog_expire_logs_seconds = 604800
+max_binlog_size = 100M
+

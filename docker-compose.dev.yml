@@ -1,0 +1,52 @@
+# Docker Compose Override for Development
+# This file extends docker-compose.yml for development-specific configurations
+# Use: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+version: '3.8'
+
+services:
+  app:
+    volumes:
+      # Enable hot-reloading by mounting the entire project
+      - ./:/var/www/html
+    environment:
+      # Development environment variables
+      APP_ENV: local
+      APP_DEBUG: "true"
+      # Xdebug configuration (optional)
+      XDEBUG_MODE: develop,debug
+      XDEBUG_CONFIG: client_host=host.docker.internal
+
+  mysql:
+    ports:
+      # Expose MySQL on host for database tools
+      - "3306:3306"
+    environment:
+      # Enable MySQL query logging for debugging
+      MYSQL_GENERAL_LOG: 1
+
+  # Vite dev server for hot module replacement
+  vite:
+    image: node:20-alpine
+    container_name: cinch_vite
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    command: npm run dev -- --host
+    ports:
+      - "5173:5173"
+    networks:
+      - cinch_network
+    depends_on:
+      - app
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: cinch_mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - cinch_network
+

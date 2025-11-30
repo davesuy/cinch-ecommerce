@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # MySQL Database Service
+  mysql:
+    image: mysql:8.0
+    container_name: cinch_mysql
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-cinch_db}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_USER: ${DB_USERNAME:-cinch_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+    networks:
+      - cinch_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # PHP-FPM Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinch_app
+    restart: unless-stopped
+    tty: true
+    working_dir: /var/www/html
+    environment:
+      SERVICE_NAME: app
+      SERVICE_TAGS: dev
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - cinch_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # Nginx Service
+  nginx:
+    image: nginx:alpine
+    container_name: cinch_nginx
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - cinch_network
+    depends_on:
+      - app
+
+  # Node.js Service for development (optional)
+  node:
+    image: node:20-alpine
+    container_name: cinch_node
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    command: npm run dev
+    ports:
+      - "5173:5173"
+    networks:
+      - cinch_network
+    profiles:
+      - dev
+
+# Docker Networks
+networks:
+  cinch_network:
+    driver: bridge
+
+# Volumes
+volumes:
+  mysql_data:
+    driver: local
+
