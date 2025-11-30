@@ -1,13 +1,13 @@
 import './bootstrap';
 import { createApp } from 'vue';
-import ProductCard from './components/ProductCard.vue';
-import ProductDetailModal from './components/ProductDetailModal.vue';
+import ProductCard al from './components/ProductDetailModal.vue';
 import CartModal from './components/CartModal.vue';
 import CheckoutModal from './components/CheckoutModal.vue';
 import OrderSuccessModal from './components/OrderSuccessModal.vue';
 import { productService, orderService } from './services/api';
 import { cartStorage, cartHelpers } from './utils/cart';
-
+from './components/ProductCard.vue';
+import ProductDetailMod
 const app = createApp({
   components: {
     ProductCard,

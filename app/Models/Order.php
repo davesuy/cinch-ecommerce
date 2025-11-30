@@ -17,6 +17,7 @@ class Order extends Model
         'shipping_address',
         'total',
         'status',
+        'user_id',
     ];
 
     protected $casts = [
@@ -41,4 +42,3 @@ class Order extends Model
         });
     }
 }
-

@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
@@ -67,6 +68,8 @@ class OrderController extends Controller
                 'shipping_address' => $request->shipping_address,
                 'total' => $orderTotal,
                 'status' => 'pending',
+                // Include user_id in the order creation
+                'user_id' => $request->user_id,
             ]);
 
             // Create order items and update stock
@@ -94,13 +97,13 @@ class OrderController extends Controller
                 Mail::to($order->customer_email)->send(new OrderPlaced($order));
             } catch (\Exception $e) {
                 // Log email error but don't fail the order
-                \Log::error('Failed to send order email: ' . $e->getMessage());
+                Log::error('Failed to send order email: ' . $e->getMessage());
             }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Order placed successfully',
-                'data' => $order
+                'data' => $order->toArray() + ['items' => $order->orderItems]
             ], 201);
 
         } catch (\Exception $e) {
@@ -133,4 +136,3 @@ class OrderController extends Controller
         ]);
     }
 }
-

@@ -21,6 +21,8 @@ return new class extends Migration
             $table->enum('status', ['pending', 'processing', 'completed', 'cancelled'])->default('pending');
             $table->timestamps();
 
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
+
             $table->index('customer_email');
             $table->index('status');
         });
@@ -34,4 +36,3 @@ return new class extends Migration
         Schema::dropIfExists('orders');
     }
 };
-
