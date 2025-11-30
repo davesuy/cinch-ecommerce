@@ -1,0 +1,686 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for Laravel Application deployment on AWS'
+
+Parameters:
+  KeyName:
+    Description: Select an existing EC2 KeyPair to enable SSH access
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair
+
+  InstanceType:
+    Description: EC2 instance type (t3.micro is free tier eligible - 750 hours/month for 12 months)
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t2.micro
+      - t3.small
+      - t2.small
+      - t3.medium
+      - t2.medium
+    ConstraintDescription: must be a valid EC2 instance type
+
+  DBUsername:
+    Description: Database administrator username
+    Type: String
+    MinLength: 1
+    MaxLength: 16
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9_]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters and underscores
+
+  DBPassword:
+    Description: Database administrator password
+    Type: String
+    NoEcho: true
+    MinLength: 6
+    MaxLength: 41
+    AllowedPattern: '^[a-zA-Z0-9]{6,}$'
+    ConstraintDescription: must contain only alphanumeric characters and be at least 6 characters long
+
+  DBName:
+    Description: Database name
+    Type: String
+    Default: cinch_db
+    MinLength: 1
+    MaxLength: 64
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9_]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters and underscores
+
+  AppEnvironment:
+    Description: Application environment
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    Default: 0.0.0.0/0
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x
+
+  CreateRDS:
+    Description: Create RDS MySQL database (No = use SQLite, faster and cheaper)
+    Type: String
+    Default: 'No'
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0c02fb55b34ab0aaa  # Amazon Linux 2023 (updated)
+    us-east-2:
+      AMI: ami-0a7d052c55b989c5e  # Amazon Linux 2023 (updated)
+    us-west-1:
+      AMI: ami-0d5ae5525eb033d0a  # Amazon Linux 2023 (updated)
+    us-west-2:
+      AMI: ami-0e8a80d3c6d6c1b6c  # Amazon Linux 2023 (updated)
+    eu-west-1:
+      AMI: ami-0d940f23d527c3ab1  # Amazon Linux 2023 (updated)
+    eu-west-2:
+      AMI: ami-0e5f882be1900e43b  # Amazon Linux 2023 (updated)
+    eu-north-1:
+      AMI: ami-0014ce3e52359afbd  # Amazon Linux 2023 (verified)
+    eu-central-1:
+      AMI: ami-0745e85b0c2a32258  # Amazon Linux 2023 (updated)
+    ap-southeast-1:
+      AMI: ami-0c3189395e5b39df7  # Amazon Linux 2023 (updated)
+    ap-southeast-2:
+      AMI: ami-0e326862c8e74c0d0  # Amazon Linux 2023 (updated)
+    ap-northeast-1:
+      AMI: ami-0f3d8b9bafe1fe1d6  # Amazon Linux 2023 (updated)
+    ap-south-1:
+      AMI: ami-0fda60cefceeaa4d3  # Amazon Linux 2023 (added)
+    ca-central-1:
+      AMI: ami-0da76f43f8e0e4d6c  # Amazon Linux 2023 (updated)
+    sa-east-1:
+      AMI: ami-0c4b44e2a1f5a5d2e  # Amazon Linux 2023 (added)
+
+Conditions:
+  CreateRDSResources: !Equals [!Ref CreateRDS, 'Yes']
+
+Resources:
+  # VPC and Network Configuration
+  LaravelVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-VPC'
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref LaravelVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-PublicSubnet1'
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref LaravelVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-PublicSubnet2'
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref LaravelVPC
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-PrivateSubnet1'
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref LaravelVPC
+      CidrBlock: 10.0.12.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-PrivateSubnet2'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-IGW'
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref LaravelVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref LaravelVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-PublicRouteTable'
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # Security Groups
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP/HTTPS and SSH access
+      VpcId: !Ref LaravelVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHLocation
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-WebServerSG'
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable database access
+      VpcId: !Ref LaravelVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-DBSG'
+
+  # IAM Role for EC2
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:DeleteObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub '${LaravelStorageBucket.Arn}'
+                  - !Sub '${LaravelStorageBucket.Arn}/*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-EC2Role'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  # S3 Bucket for Laravel Storage
+  LaravelStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-laravel-storage-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Storage'
+
+  # RDS Database (Optional)
+  # FREE TIER CONFIGURATION:
+  # - db.t3.micro: 750 hours/month (enough for 1 instance running 24/7)
+  # - 20GB storage included
+  # - No backups, no Multi-AZ, no encryption to stay free
+  # - After 12 months, charges apply (~$15/month)
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Condition: CreateRDSResources
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS database
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-DBSubnetGroup'
+
+  LaravelDatabase:
+    Type: AWS::RDS::DBInstance
+    Condition: CreateRDSResources
+    DeletionPolicy: Delete  # Changed from Snapshot to avoid costs
+    Properties:
+      DBInstanceIdentifier: !Sub '${AWS::StackName}-db'
+      DBName: !Ref DBName
+      Engine: mysql
+      EngineVersion: '8.0.39'  # Free tier compatible version (widely available)
+      DBInstanceClass: db.t3.micro  # Free tier eligible (750 hours/month)
+      AllocatedStorage: 20  # Free tier allows up to 20GB
+      StorageType: gp2
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 0  # No backups to stay in free tier
+      DeleteAutomatedBackups: true
+      MultiAZ: false  # Must be false for free tier
+      StorageEncrypted: false  # Encryption may incur costs
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-Database'
+
+  # Elastic IP for EC2 Instance
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-EIP'
+
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref WebServerInstance
+      EIP: !Ref ElasticIP
+
+  # EC2 Instance
+  WebServerInstance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - AttachGateway
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: '0'
+          GroupSet:
+            - !Ref WebServerSecurityGroup
+          SubnetId: !Ref PublicSubnet1
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp2
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !If
+          - CreateRDSResources
+          - !Sub |
+              #!/bin/bash
+              set -e
+
+              # Update system
+              yum update -y
+
+              # Install Docker
+              yum install -y docker git
+              systemctl start docker
+              systemctl enable docker
+              usermod -aG docker ec2-user
+
+              # Install Docker Compose
+              curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              chmod +x /usr/local/bin/docker-compose
+              ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+              # Clone application (update with your Git repo)
+              cd /home/ec2-user
+              # git clone https://github.com/yourusername/cinch-ecommerce.git app
+              # For now, create app directory
+              mkdir -p app
+              cd app
+
+              # Create .env file with database configuration
+              cat > .env << 'ENVFILE'
+              APP_NAME=Laravel
+              APP_ENV=${AppEnvironment}
+              APP_KEY=
+              APP_DEBUG=false
+              APP_URL=http://${ElasticIP}
+
+              LOG_CHANNEL=stack
+              LOG_LEVEL=info
+
+              DB_CONNECTION=mysql
+              DB_HOST=${LaravelDatabase.Endpoint.Address}
+              DB_PORT=${LaravelDatabase.Endpoint.Port}
+              DB_DATABASE=${DBName}
+              DB_USERNAME=${DBUsername}
+              DB_PASSWORD=${DBPassword}
+
+              BROADCAST_DRIVER=log
+              CACHE_DRIVER=file
+              FILESYSTEM_DISK=s3
+              QUEUE_CONNECTION=database
+              SESSION_DRIVER=database
+
+              AWS_BUCKET=${LaravelStorageBucket}
+              AWS_DEFAULT_REGION=${AWS::Region}
+              AWS_USE_PATH_STYLE_ENDPOINT=false
+
+              MAIL_MAILER=log
+              ENVFILE
+
+              # Set permissions
+              chown -R ec2-user:ec2-user /home/ec2-user/app
+
+              # Create installation script
+              cat > /home/ec2-user/install.sh << 'INSTALLSCRIPT'
+              #!/bin/bash
+              cd /home/ec2-user/app
+
+              # Start Docker services
+              docker-compose up -d --build
+
+              # Wait for containers to be ready
+              sleep 10
+
+              # Install dependencies
+              docker-compose exec -T app composer install --no-dev --optimize-autoloader
+              docker-compose exec -T app php artisan key:generate
+              docker-compose exec -T app php artisan config:cache
+              docker-compose exec -T app php artisan route:cache
+              docker-compose exec -T app php artisan view:cache
+
+              # Run migrations
+              docker-compose exec -T app php artisan migrate --force --seed
+
+              # Set permissions
+              docker-compose exec -T app chown -R www-data:www-data storage bootstrap/cache
+              docker-compose exec -T app chmod -R 775 storage bootstrap/cache
+
+              # Build frontend
+              docker-compose exec -T app npm install
+              docker-compose exec -T app npm run build
+
+              echo "Installation complete! Visit http://${ElasticIP}"
+              INSTALLSCRIPT
+
+              chmod +x /home/ec2-user/install.sh
+
+              # Create systemd service for Docker Compose
+              cat > /etc/systemd/system/laravel-app.service << 'SERVICEFILE'
+              [Unit]
+              Description=Laravel Docker Application
+              Requires=docker.service
+              After=docker.service
+
+              [Service]
+              Type=oneshot
+              RemainAfterExit=yes
+              WorkingDirectory=/home/ec2-user/app
+              ExecStart=/usr/local/bin/docker-compose up -d
+              ExecStop=/usr/local/bin/docker-compose down
+              User=ec2-user
+
+              [Install]
+              WantedBy=multi-user.target
+              SERVICEFILE
+
+              systemctl daemon-reload
+
+              # Log completion
+              echo "Bootstrap completed at $(date)" > /var/log/bootstrap.log
+          - !Sub |
+              #!/bin/bash
+              set -e
+
+              # Update system
+              yum update -y
+
+              # Install Docker
+              yum install -y docker git
+              systemctl start docker
+              systemctl enable docker
+              usermod -aG docker ec2-user
+
+              # Install Docker Compose
+              curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              chmod +x /usr/local/bin/docker-compose
+              ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+              # Clone application (update with your Git repo)
+              cd /home/ec2-user
+              # git clone https://github.com/yourusername/cinch-ecommerce.git app
+              # For now, create app directory
+              mkdir -p app
+              cd app
+
+              # Create .env file with SQLite configuration
+              cat > .env << 'ENVFILE'
+              APP_NAME=Laravel
+              APP_ENV=${AppEnvironment}
+              APP_KEY=
+              APP_DEBUG=false
+              APP_URL=http://${ElasticIP}
+
+              LOG_CHANNEL=stack
+              LOG_LEVEL=info
+
+              DB_CONNECTION=sqlite
+              DB_DATABASE=/var/www/html/database/database.sqlite
+
+              BROADCAST_DRIVER=log
+              CACHE_DRIVER=file
+              FILESYSTEM_DISK=s3
+              QUEUE_CONNECTION=database
+              SESSION_DRIVER=database
+
+              AWS_BUCKET=${LaravelStorageBucket}
+              AWS_DEFAULT_REGION=${AWS::Region}
+              AWS_USE_PATH_STYLE_ENDPOINT=false
+
+              MAIL_MAILER=log
+              ENVFILE
+
+              # Set permissions
+              chown -R ec2-user:ec2-user /home/ec2-user/app
+
+              # Create installation script
+              cat > /home/ec2-user/install.sh << 'INSTALLSCRIPT'
+              #!/bin/bash
+              cd /home/ec2-user/app
+
+              # Create SQLite database file
+              mkdir -p database
+              touch database/database.sqlite
+
+              # Start Docker services
+              docker-compose up -d --build
+
+              # Wait for containers to be ready
+              sleep 10
+
+              # Install dependencies
+              docker-compose exec -T app composer install --no-dev --optimize-autoloader
+              docker-compose exec -T app php artisan key:generate
+              docker-compose exec -T app php artisan config:cache
+              docker-compose exec -T app php artisan route:cache
+              docker-compose exec -T app php artisan view:cache
+
+              # Run migrations
+              docker-compose exec -T app php artisan migrate --force --seed
+
+              # Set permissions
+              docker-compose exec -T app chown -R www-data:www-data storage bootstrap/cache database
+              docker-compose exec -T app chmod -R 775 storage bootstrap/cache database
+
+              # Build frontend
+              docker-compose exec -T app npm install
+              docker-compose exec -T app npm run build
+
+              echo "Installation complete! Visit http://${ElasticIP}"
+              INSTALLSCRIPT
+
+              chmod +x /home/ec2-user/install.sh
+
+              # Create systemd service for Docker Compose
+              cat > /etc/systemd/system/laravel-app.service << 'SERVICEFILE'
+              [Unit]
+              Description=Laravel Docker Application
+              Requires=docker.service
+              After=docker.service
+
+              [Service]
+              Type=oneshot
+              RemainAfterExit=yes
+              WorkingDirectory=/home/ec2-user/app
+              ExecStart=/usr/local/bin/docker-compose up -d
+              ExecStop=/usr/local/bin/docker-compose down
+              User=ec2-user
+
+              [Install]
+              WantedBy=multi-user.target
+              SERVICEFILE
+
+              systemctl daemon-reload
+
+              # Log completion
+              echo "Bootstrap completed at $(date)" > /var/log/bootstrap.log
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-WebServer'
+
+Outputs:
+  WebsiteURL:
+    Description: URL of the Laravel application
+    Value: !Sub 'http://${ElasticIP}'
+
+  PublicIP:
+    Description: Public IP address of the web server
+    Value: !Ref ElasticIP
+
+  SSHCommand:
+    Description: SSH command to connect to the instance
+    Value: !Sub 'ssh -i /path/to/${KeyName}.pem ec2-user@${ElasticIP}'
+
+  DatabaseEndpoint:
+    Description: RDS database endpoint (only if CreateRDS=Yes)
+    Condition: CreateRDSResources
+    Value: !GetAtt LaravelDatabase.Endpoint.Address
+
+  DatabasePort:
+    Description: RDS database port (only if CreateRDS=Yes)
+    Condition: CreateRDSResources
+    Value: !GetAtt LaravelDatabase.Endpoint.Port
+
+  DatabaseName:
+    Description: Database name
+    Condition: CreateRDSResources
+    Value: !Ref DBName
+
+  S3BucketName:
+    Description: S3 bucket for Laravel storage
+    Value: !Ref LaravelStorageBucket
+
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref WebServerInstance
+
+  DatabaseType:
+    Description: Database type being used
+    Value: !If [CreateRDSResources, 'RDS MySQL 8.0', 'SQLite (local)']
+
+  FreeTierEligibility:
+    Description: AWS Free Tier eligibility status
+    Value: !If
+      - CreateRDSResources
+      - !Sub |
+          ✅ EC2 Instance: ${InstanceType} (750 hours/month for 12 months)
+          ✅ RDS Database: db.t3.micro (750 hours/month for 12 months)
+          ✅ Storage: 20GB EBS + 20GB RDS included
+          ⚠️  Note: Free tier valid for first 12 months only
+      - !Sub |
+          ✅ EC2 Instance: ${InstanceType} (750 hours/month for 12 months)
+          ✅ RDS Database: N/A - Using SQLite (local file)
+          ✅ Storage: 20GB EBS included
+          ⚠️  Note: Free tier valid for first 12 months only
+
+  SetupInstructions:
+    Description: Next steps to complete setup
+    Value: !Sub |
+      1. SSH to instance: ssh -i /path/to/${KeyName}.pem ec2-user@${ElasticIP}
+      2. Navigate to app: cd /home/ec2-user/app
+      3. Place your application code in this directory
+      4. Review .env file (database credentials already configured)
+      5. Run: ./install.sh
+      6. Access your app at: http://${ElasticIP}
