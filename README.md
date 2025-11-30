@@ -151,6 +151,67 @@ aws cloudformation create-stack \
 - Database management (RDS integration)
 - Cost optimization strategies
 
+## 📁 Project structure
+
+A quick overview of the important folders and files in this repository:
+
+- `app/` - Laravel backend: controllers, models, mailables and providers.
+  - `Http/Controllers/` - controllers handling HTTP and API requests (e.g. ProductController, OrderController).
+  - `Models/` - Eloquent models (Product, Order, OrderItem, User).
+- `bootstrap/` - framework bootstrap files.
+- `config/` - Laravel configuration files.
+- `database/` - migrations, factories and seeders (sample product seeder included).
+- `public/` - the web root; built frontend assets live in `public/build` after Vite build.
+- `resources/` - frontend and view resources.
+  - `resources/views/` - Blade templates (server-rendered pages / email templates).
+  - `resources/js/` - Vue.js frontend source:
+    - `app.js` - main entry (mounts Vue and wires components/services)
+    - `components/` - Single File Components (ProductCard.vue, ProductDetailModal.vue, CartModal.vue, CheckoutModal.vue, OrderSuccessModal.vue)
+    - `services/` - `api.js` (centralized API service layer)
+    - `utils/` - small utility modules (`cart.js` for localStorage/cart helpers)
+  - `resources/css/` - Tailwind / custom CSS.
+- `routes/`
+  - `api.php` - API routes (recommended for all API endpoints).
+  - `web.php` - web routes (page routes that return Blade views).
+- `cloudformation-template.yaml` - AWS CloudFormation template (kept intentionally to demonstrate DevOps/IaC skills).
+- `Dockerfile`, `docker-compose.yml` - containerization config.
+- `composer.json`, `package.json` - PHP & JS dependencies.
+- `tests/` - PHPUnit tests for backend (feature/unit tests).
+
+## 🛠️ How I coded it — architecture & decisions
+
+This project follows an API-first, component-driven approach with clear separation between backend and frontend:
+
+Backend (Laravel)
+- API routes are defined in `routes/api.php` (keeps API endpoints separate from view routes in `web.php`). Using the `api` middleware group makes it easy to change auth or throttling for API traffic.
+- Controllers follow single-responsibility: each controller delegates business logic to models and simple services where appropriate. Eloquent models define the relationships (e.g. Order -> OrderItem -> Product).
+- Validation is handled via Form Requests (or controller validation) to keep controllers thin and improve reuse and testability.
+- Migrations and seeders live in `database/` so the schema and sample data are reproducible — useful for CI and local dev.
+- Emails are sent with Laravel Mailables (see `app/Mail/OrderPlaced.php`) and logged to `storage/logs` in local/dev environments.
+
+Frontend (Vue 3 + Vite)
+- The frontend is modularized with Small, focused Single File Components under `resources/js/components/` to improve testability and reusability.
+- `resources/js/services/api.js` is the single place for all HTTP calls (using fetch or axios). This keeps components clean and simplifies error handling and mocking in tests.
+- `resources/js/utils/cart.js` contains pure helper functions (save/load cart to localStorage, calculate totals). Keeping these pure eases unit testing.
+- `resources/js/app.js` bootstraps the Vue app and registers components; heavy logic is pushed to components, services, or utils.
+- Tailwind CSS is used for utility-first styling; the design is responsive and lightweight.
+
+DevOps & Deploy
+- `cloudformation-template.yaml` documents an IaC approach for provisioning VPC, EC2 (with Docker), optional RDS, and S3. It's kept in the repo as a demonstration of DevOps capability.
+- Docker and docker-compose are used for local development parity (services: app, db, optionally phpmyadmin).
+
+Testing & Quality
+- PHPUnit is configured (see `phpunit.xml`) for backend tests; add feature tests for critical flows (place order, product listing).
+- Frontend components can be covered with unit tests (Vitest / Jest) if you add a test harness.
+
+Security & Environment
+- Sensitive values are kept in `.env` and should never be committed. The `cloudformation-template.yaml` is parameterized so secrets are not hard-coded.
+
+Tips for contributors
+- Use `routes/api.php` for any new API endpoints. Keep `web.php` limited to page/view routes.
+- Add business-logic-heavy code to services (or the `app/` layer) rather than bloating controllers or components.
+- Run `npm run dev` (inside container or locally) and `php artisan migrate --seed` when setting up.
+
 ## 🔧 Troubleshooting
 
 **Products not loading:**
@@ -175,4 +236,3 @@ docker compose exec app npm run build
 ## 📄 License
 
 This project is open-source and available under the MIT License.
-
