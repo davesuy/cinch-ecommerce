@@ -4,38 +4,20 @@ A modern e-commerce platform built with **Laravel 11**, **Vue.js 3**, **MySQL**,
 
 ## ✨ Features
 
-- **Product Catalog** - Browse, search, and filter products  
-- **Shopping Cart** - Add to cart with persistent storage (localStorage)  
-- **Checkout System** - Customer information and order placement  
-- **Email Notifications** - Automated order confirmation emails  
-- **Inventory Management** - Real-time stock tracking and auto-deduction  
-- **Responsive Dark UI** - Modern dark-themed interface with Tailwind CSS  
+- Product catalog with search and filters
+- Shopping cart with localStorage persistence
+- Customer checkout and order placement
+- Email notifications for orders
+- Real-time inventory management
+- Responsive dark UI with Tailwind CSS
 
 ## 🚀 Tech Stack
 
 - **Backend**: Laravel 11, PHP 8.2+
 - **Frontend**: Vue.js 3 (Composition API), Vite
 - **Database**: MySQL 8.0
-- **Styling**: Tailwind CSS (Dark Theme)
-- **Email**: Laravel Mail with SMTP (Gmail)
+- **Styling**: Tailwind CSS
 - **Containerization**: Docker & Docker Compose
-
-## 📦 What's Included
-
-### Backend
-- RESTful API endpoints for products and orders
-- Product, Order, and OrderItem models with relationships
-- Order validation and stock management
-- Email notifications with HTML templates
-- Database seeders with 10 sample products
-
-### Frontend
-- Complete Vue.js 3 single-page application
-- Product listing with search and category filters
-- Shopping cart with quantity management
-- Checkout form with validation
-- Order confirmation display
-- Responsive grid layout
 
 ## 🐳 Quick Setup
 
@@ -44,6 +26,7 @@ A modern e-commerce platform built with **Laravel 11**, **Vue.js 3**, **MySQL**,
 - Git installed
 
 ### Installation
+
 ```bash
 # Clone the repository
 git clone https://github.com/davesuy/cinch-ecommerce.git
@@ -52,287 +35,144 @@ cd cinch-ecommerce
 # Copy environment file
 cp .env.example .env
 
-# Run automated setup
-bash setup-ecommerce.sh
-```
+# Start Docker containers
+docker compose up -d
 
-The setup script will:
-- Start Docker containers (Nginx, PHP-FPM, MySQL)
-- Install all PHP and Node dependencies
-- Generate application key
-- Run migrations and seed 10 sample products
-- Build frontend assets
-- Set proper permissions
+# Install dependencies
+docker compose exec app composer install
+docker compose exec app npm install
+
+# Setup application
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate --seed
+docker compose exec app npm run build
+
+# Set permissions
+docker compose exec app chown -R www-data:www-data storage bootstrap/cache
+docker compose exec app chmod -R 775 storage bootstrap/cache
+```
 
 ### Access the Application
-🌐 **Web Application**: http://localhost  
+🌐 **Application**: http://localhost  
 📦 **Sample Products**: 10 products pre-seeded
 
-## 🎯 Using the Application
+## 🛠️ Development Commands
 
-1. **Browse Products** - Visit http://localhost
-2. **Search & Filter** - Use search bar and category filter
-3. **View Details** - Click "View Details" on any product
-4. **Add to Cart** - Click cart icon to view items
-5. **Checkout** - Fill customer info and place order
-6. **Confirmation** - See order success message
-7. **Check Email** - View order email in logs
-
-## 🛠️ Common Commands
-
-### Docker
 ```bash
-docker compose up -d              # Start containers
-docker compose down               # Stop containers
-docker compose restart            # Restart all services
-docker compose logs -f            # View live logs
-docker compose ps                 # Check container status
-```
+# Start/stop containers
+docker compose up -d
+docker compose down
 
-### Laravel
-```bash
-docker compose exec app php artisan migrate       # Run migrations
-docker compose exec app php artisan db:seed       # Seed database
-docker compose exec app php artisan cache:clear   # Clear cache
-docker compose exec app php artisan config:clear  # Clear config cache
-```
+# Clear caches
+docker compose exec app php artisan cache:clear
+docker compose exec app php artisan config:clear
 
-### Rebuild Assets
-```bash
-docker compose exec app npm run build    # Production build
+# Run migrations
+docker compose exec app php artisan migrate
+
+# Rebuild frontend
+docker compose exec app npm run dev    # Development
+docker compose exec app npm run build  # Production
+
+# View logs
+docker compose logs -f app
 ```
 
 ## 📋 API Endpoints
 
-### Products
-- `GET /api/products` - List all products (with optional search & category filter)
-- `GET /api/products/{id}` - Get single product details
-
-### Orders  
+- `GET /api/products` - List all products (with search & filters)
+- `GET /api/products/{id}` - Get product details
 - `POST /api/orders` - Create new order
 
-**Example: Create Order**
-```bash
-curl -X POST http://localhost/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{
-    "customer_name": "John Doe",
-    "customer_email": "john@example.com",
-    "shipping_address": "123 Main St, City, State 12345",
-    "items": [
-      {"product_id": 1, "quantity": 2}
-    ]
-  }'
+**Example Order:**
+```json
+{
+  "customer_name": "John Doe",
+  "customer_email": "john@example.com",
+  "shipping_address": "123 Main St, City, State 12345",
+  "items": [
+    {"product_id": 1, "quantity": 2}
+  ]
+}
 ```
-
-## 🎨 Frontend Architecture
-
-Built with **Vue.js 3** using Composition API:
-- `App.vue` - Main application component
-- `ProductCard.vue` - Product grid item
-- `ProductDetail.vue` - Single product view
-- `Cart.vue` - Shopping cart modal
-- `Checkout.vue` - Checkout form
-- `OrderSuccess.vue` - Order confirmation
-
-## 🗄️ Database Schema
-
-**Products**: id, name, description, price, stock, image, category  
-**Orders**: id, customer details, total, status  
-**Order Items**: id, order_id, product_id, quantity, price
 
 ## 📧 Email Configuration
 
-### Current Setup (Development)
-Emails are logged to `storage/logs/laravel.log` by default using `MAIL_MAILER=log` in `.env`.
+Development mode logs emails to `storage/logs/laravel.log`.
 
-### Enable Real Emails with Gmail
+For production with Gmail:
 
-1. **Create Gmail App Password**
-   - Enable 2-Factor Authentication on your Gmail account
-   - Go to https://myaccount.google.com/apppasswords
-   - Generate a new App Password
-
-2. **Update .env file**
+1. Create Gmail App Password at https://myaccount.google.com/apppasswords
+2. Update `.env`:
    ```env
    MAIL_MAILER=smtp
    MAIL_HOST=smtp.gmail.com
    MAIL_PORT=587
    MAIL_USERNAME=your_email@gmail.com
-   MAIL_PASSWORD=your_16_char_app_password
+   MAIL_PASSWORD=your_app_password
    MAIL_ENCRYPTION=tls
    MAIL_FROM_ADDRESS="your_email@gmail.com"
    MAIL_FROM_NAME="Cinch E-Commerce"
    ```
+3. Clear cache: `docker compose exec app php artisan config:clear`
 
-3. **Clear cache and restart**
-   ```bash
-   docker compose exec app php artisan config:clear
-   docker compose restart app
-   ```
+## ☁️ DevOps & Infrastructure
 
-### Alternative: Mailtrap (Testing)
-For testing without sending real emails:
-1. Sign up at https://mailtrap.io (free)
-2. Update `.env` with Mailtrap SMTP credentials
-3. All emails will be captured in Mailtrap inbox
+### AWS CloudFormation Template
 
-## 🔧 Troubleshooting
+This project includes a complete **Infrastructure as Code** solution using AWS CloudFormation (`cloudformation-template.yaml`).
 
-### Products not loading
-```bash
-# Reseed database
-docker compose exec app php artisan migrate:fresh --seed
+**Features:**
+- **Automated VPC Setup** - Creates isolated network with public/private subnets
+- **EC2 Instance Provisioning** - Auto-configures Ubuntu server with Docker pre-installed
+- **Security Groups** - Pre-configured firewall rules for HTTP, HTTPS, and SSH
+- **Optional RDS MySQL** - Managed database option for production workloads
+- **S3 Integration** - Optional storage bucket for static assets
+- **Auto-scaling Ready** - Template structured for easy scaling modifications
+- **Cost-Optimized** - Configurable instance types (t3.micro free tier eligible)
 
-# Clear caches
-docker compose exec app php artisan config:clear
-docker compose exec app php artisan cache:clear
-
-# Restart services
-docker compose restart
-```
-
-### Permission errors
-```bash
-docker compose exec app chown -R www-data:www-data storage bootstrap/cache
-docker compose exec app chmod -R 775 storage bootstrap/cache
-```
-
-### Frontend build issues
-```bash
-docker compose exec app rm -rf node_modules
-docker compose exec app npm install
-docker compose exec app npm run build
-```
-
-## ☁️ Production Deployment (AWS EC2)
-
-### Prerequisites
-- AWS Account
-- EC2 Key Pair created
-- AWS CLI configured (optional)
-
-### Manual Deployment Steps
-
-1. **Launch EC2 Instance**
-   - Use Ubuntu 22.04 LTS
-   - t2.micro or larger
-   - Open ports: 22 (SSH), 80 (HTTP), 443 (HTTPS)
-
-2. **Install Docker on EC2**
-   ```bash
-   ssh -i your-key.pem ubuntu@your-ec2-ip
-   
-   # Install Docker
-   curl -fsSL https://get.docker.com -o get-docker.sh
-   sudo sh get-docker.sh
-   sudo usermod -aG docker ubuntu
-   
-   # Log out and back in
-   exit
-   ssh -i your-key.pem ubuntu@your-ec2-ip
-   ```
-
-3. **Deploy Application**
-   ```bash
-   # Clone repository
-   cd ~
-   git clone https://github.com/davesuy/cinch-ecommerce.git app
-   cd app
-   
-   # Copy and configure .env
-   cp .env.example .env
-   nano .env  # Update APP_URL, DB settings, MAIL settings
-   
-   # Install dependencies
-   sudo docker compose exec -T app composer install --optimize-autoloader
-   
-   # Copy built assets from local or build on server
-   # If building on server, you'll need Node.js
-   
-   # Setup database
-   sudo docker compose exec -T app php artisan key:generate
-   sudo docker compose exec -T app php artisan migrate --force
-   sudo docker compose exec -T app php artisan db:seed --force
-   
-   # Set permissions
-   sudo chown -R www-data:www-data storage bootstrap/cache
-   sudo chmod -R 775 storage bootstrap/cache
-   
-   # Clear caches
-   sudo docker compose exec -T app php artisan config:clear
-   sudo docker compose exec -T app php artisan cache:clear
-   ```
-
-4. **Access Application**
-   - Visit: `http://your-ec2-ip`
-
-### Using CloudFormation (Automated)
-
-A CloudFormation template (`cloudformation-template.yaml`) is included for automated infrastructure setup. It creates:
-- VPC with public/private subnets
-- EC2 instance with Docker pre-installed
-- Security groups
-- Optional: RDS MySQL database
-- Optional: S3 bucket for storage
-
+**Deploy with AWS CLI:**
 ```bash
 aws cloudformation create-stack \
   --stack-name cinch-ecommerce \
   --template-body file://cloudformation-template.yaml \
   --parameters \
     ParameterKey=KeyName,ParameterValue=your-key-pair \
-    ParameterKey=UseRDS,ParameterValue=No \
-  --capabilities CAPABILITY_IAM \
-  --region us-east-1
+    ParameterKey=InstanceType,ParameterValue=t3.micro \
+  --capabilities CAPABILITY_IAM
 ```
 
-**Note**: Set `UseRDS=No` to install MySQL in Docker (free tier friendly).
+**DevOps Skills Demonstrated:**
+- Infrastructure as Code (IaC) with CloudFormation
+- Docker containerization and orchestration
+- CI/CD ready deployment structure
+- Security best practices (security groups, IAM roles)
+- Network architecture (VPC, subnets, routing)
+- Database management (RDS integration)
+- Cost optimization strategies
 
-### Database Connection with Sequel Ace
+## 🔧 Troubleshooting
 
-To connect to production database from your local machine:
-
-**Connection Type**: SSH
-
-- **SSH Host**: Your EC2 IP
-- **SSH User**: ubuntu
-- **SSH Key**: Path to your .pem file
-- **SSH Port**: 22
-- **MySQL Host**: 127.0.0.1
-- **Username**: root (or check .env)
-- **Password**: Check .env DB_PASSWORD
-- **Database**: cinch_ecommerce (or check .env)
-- **Port**: 3306
-
-## 📝 Project Structure
-
+**Products not loading:**
+```bash
+docker compose exec app php artisan migrate:fresh --seed
+docker compose exec app php artisan cache:clear
 ```
-├── app/
-│   ├── Http/Controllers/     # ProductController, OrderController
-│   ├── Mail/                 # OrderPlaced mailable
-│   └── Models/               # Product, Order, OrderItem
-├── database/
-│   ├── migrations/           # Schema definitions
-│   └── seeders/              # ProductSeeder (10 products)
-├── resources/
-│   ├── js/
-│   │   └── app.js           # Complete Vue.js app
-│   └── views/
-│       ├── welcome.blade.php # Main layout
-│       └── emails/          # Order confirmation template
-├── routes/
-│   └── web.php              # API routes
-├── docker-compose.yml       # Main Docker configuration
-├── docker-compose.prod.yml  # Production overrides
-└── setup-ecommerce.sh       # Automated setup script
+
+**Permission errors:**
+```bash
+docker compose exec app chown -R www-data:www-data storage bootstrap/cache
+docker compose exec app chmod -R 775 storage bootstrap/cache
+```
+
+**Build issues:**
+```bash
+docker compose exec app rm -rf node_modules
+docker compose exec app npm install
+docker compose exec app npm run build
 ```
 
 ## 📄 License
 
-This project is built for demonstration purposes using Laravel 11 framework.
-
----
-
-**Built with ❤️ using Laravel 11, Vue.js 3, MySQL, and Docker**
+This project is open-source and available under the MIT License.
 
