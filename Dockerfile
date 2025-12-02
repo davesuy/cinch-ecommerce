@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
     nodejs \
     npm \
     libzip-dev \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip opcache
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -26,6 +26,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Set proper permissions for www-data user
 RUN chown -R www-data:www-data /var/www
+
+# Copy custom PHP-FPM pool configuration
+COPY ./docker/php/www.conf /usr/local/etc/php-fpm.d/zz-custom.conf
 
 # Expose port 9000 and start php-fpm server
 EXPOSE 9000
