@@ -4,7 +4,7 @@
 # Clears caches and old files to prevent memory buildup
 # Add to crontab: 0 2 * * * /home/ubuntu/cleanup-cache.sh >> /home/ubuntu/cleanup.log 2>&1
 
-PROJECT_DIR="/home/ubuntu/cinch-ecommerce"
+PROJECT_DIR="/home/ubuntu/app"
 
 echo "=== Starting cache cleanup at $(date) ==="
 cd $PROJECT_DIR

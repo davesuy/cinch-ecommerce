@@ -6,7 +6,7 @@
 
 LOG_FILE="/home/ubuntu/system-monitor.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-PROJECT_DIR="/home/ubuntu/cinch-ecommerce"
+PROJECT_DIR="/home/ubuntu/app"
 
 echo "=== System Status at $TIMESTAMP ===" >> $LOG_FILE
 

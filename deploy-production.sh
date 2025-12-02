@@ -2,7 +2,7 @@
 
 # Production Deployment Script for EC2
 # This script deploys updates and applies 502 fix configurations
-# Run on EC2: cd /home/ubuntu/cinch-ecommerce && ./deploy-production.sh
+# Run on EC2: cd /home/ubuntu/app && ./deploy-production.sh
 
 set -e  # Exit on error
 
@@ -11,7 +11,7 @@ echo "  CINCH E-COMMERCE DEPLOYMENT"
 echo "==================================="
 echo ""
 
-PROJECT_DIR="/home/ubuntu/cinch-ecommerce"
+PROJECT_DIR="/home/ubuntu/app"
 cd $PROJECT_DIR
 
 # Pull latest code
