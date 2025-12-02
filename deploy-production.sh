@@ -34,8 +34,9 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "⏳ Waiting for containers to start..."
 sleep 10
 
-# Run Laravel optimizations
-echo "⚡ Running Laravel optimizations..."
+# Clear and rebuild Laravel cache
+echo "⚡ Clearing and rebuilding Laravel cache..."
+docker compose exec -T app php artisan optimize:clear
 docker compose exec -T app php artisan config:cache
 docker compose exec -T app php artisan route:cache
 docker compose exec -T app php artisan view:cache

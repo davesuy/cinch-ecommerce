@@ -116,6 +116,102 @@ For production with Gmail:
    ```
 3. Clear cache: `docker compose exec app php artisan config:clear`
 
+## ☁️ Production Deployment (AWS EC2)
+
+### Quick Deploy to EC2
+
+**Important:** Project is deployed at `/home/ubuntu/app` on EC2 (not `/home/ubuntu/cinch-ecommerce`)
+
+```bash
+# SSH into EC2
+ssh -i ~/Desktop/Web\ Development/laravel-2025.pem ubuntu@51.21.234.223
+
+# Navigate to project
+cd /home/ubuntu/app
+
+# Pull latest changes
+git pull origin main
+
+# Make scripts executable
+chmod +x deploy-production.sh monitor-system.sh cleanup-cache.sh
+
+# Deploy updates
+./deploy-production.sh
+```
+
+### Production Scripts
+
+- **`deploy-production.sh`** - Full deployment (rebuild, migrate, optimize)
+- **`monitor-system.sh`** - Check system health, memory, containers
+- **`cleanup-cache.sh`** - Clear Laravel caches, old sessions/logs
+
+### Automated Maintenance
+
+Cron jobs are configured for automatic maintenance:
+```bash
+*/5 * * * * /home/ubuntu/app/monitor-system.sh          # Monitor every 5 min
+0 2 * * * /home/ubuntu/app/cleanup-cache.sh >> /home/ubuntu/cleanup.log 2>&1  # Daily cleanup at 2 AM
+```
+
+### Production Configuration
+
+**Memory Optimizations:**
+- PHP-FPM: Max 10 processes (limited for 1GB instance)
+- MySQL: 256MB buffer pool (optimized for t2.micro)
+- Docker: Memory limits on all containers
+- Redis: Added for session/cache management
+
+**Container Setup:**
+- `app` - PHP 8.2 FPM (512MB limit)
+- `nginx` - Web server (128MB limit)
+- `mysql` - Database (512MB limit)
+- `redis` - Cache/sessions (unlimited)
+
+### Quick Commands
+
+```bash
+# Check status
+docker compose ps
+free -h
+
+# View logs
+docker compose logs --tail=50 app
+tail -f /home/ubuntu/system-monitor.log
+
+# Restart services
+docker compose restart app nginx
+
+# Fix 500 errors after reboot
+./post-reboot-fix.sh
+
+# Emergency fix
+./deploy-production.sh
+```
+
+### ⚠️ After EC2 Reboot
+
+If the website shows **500 errors** or "This page isn't working" after an EC2 reboot:
+
+**Quick Fix:**
+```bash
+cd /home/ubuntu/app
+./post-reboot-fix.sh
+```
+
+Or manually:
+```bash
+docker exec cinch_app php artisan optimize:clear
+docker exec cinch_app php artisan config:cache
+docker exec cinch_app php artisan view:cache
+```
+
+**Why:** Laravel's cached configuration can get corrupted during reboots. This clears and rebuilds the cache.
+
+### Production URL
+🌐 **Live Site**: http://51.21.234.223
+
+---
+
 ## ☁️ DevOps & Infrastructure
 
 ### AWS CloudFormation Template
