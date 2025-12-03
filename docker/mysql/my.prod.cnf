@@ -1,19 +1,21 @@
 [mysqld]
-# Production MySQL configuration optimized for low-memory instances
+# Production MySQL configuration optimized for t2.micro (1GB RAM)
 default_authentication_plugin = mysql_native_password
 
-# Performance tuning for t2.micro/small instances
-max_connections = 50
-innodb_buffer_pool_size = 256M
-innodb_log_file_size = 64M
+# Memory optimization for low-memory instances
+max_connections = 30
+innodb_buffer_pool_size = 128M
+innodb_log_file_size = 32M
 innodb_flush_method = O_DIRECT
 innodb_flush_log_at_trx_commit = 2
 skip-name-resolve
 
-# Disable query cache (deprecated in MySQL 8.0)
+# Performance tuning
 query_cache_type = 0
 query_cache_size = 0
-table_open_cache = 200
+table_open_cache = 100
+max_heap_table_size = 16M
+tmp_table_size = 16M
 
 # Logging (disable general log in production)
 general_log = 0
@@ -24,13 +26,13 @@ long_query_time = 2
 # Connection settings
 wait_timeout = 28800
 interactive_timeout = 28800
-max_allowed_packet = 64M
+max_allowed_packet = 16M
 
 # Character set
 character-set-server = utf8mb4
 collation-server = utf8mb4_unicode_ci
 
-# Binary logging for replication/backup
+# Binary logging
 server-id = 1
 log_bin = /var/lib/mysql/mysql-bin.log
 binlog_expire_logs_seconds = 604800
