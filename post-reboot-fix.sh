@@ -17,6 +17,12 @@ echo "🔧 Fixing Docker daemon..."
 # Fix hostname resolution
 echo "127.0.0.1 ip-10-0-1-123" | sudo tee -a /etc/hosts
 
+# Fix DNS resolution (add Google DNS if missing)
+if ! grep -q "nameserver 8.8.8.8" /etc/resolv.conf; then
+    echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
+    echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+fi
+
 # Restart Docker
 sudo systemctl restart docker
 
