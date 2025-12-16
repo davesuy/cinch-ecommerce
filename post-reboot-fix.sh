@@ -41,18 +41,18 @@ sudo usermod -aG docker ubuntu
 
 echo ""
 echo "📋 Checking container status..."
-docker compose ps
+sudo docker compose ps
 
 echo ""
 echo "🧹 Clearing corrupted Laravel cache..."
-docker exec cinch_app php artisan config:clear
-docker exec cinch_app php artisan route:clear
-docker exec cinch_app php artisan view:clear
-docker exec cinch_app php artisan cache:clear
+sudo docker exec cinch_app php artisan config:clear
+sudo docker exec cinch_app php artisan route:clear
+sudo docker exec cinch_app php artisan view:clear
+sudo docker exec cinch_app php artisan cache:clear
 
 echo ""
 echo "🔄 Restarting app container to clear in-memory state..."
-docker compose restart app
+sudo docker compose restart app
 
 echo ""
 echo "⏳ Waiting for app to restart..."
