@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
     nodejs \
     npm \
     libzip-dev \
+    logrotate \
+    cron \
     && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip opcache
 
 # Clear cache
@@ -30,7 +32,16 @@ RUN chown -R www-data:www-data /var/www
 # Copy custom PHP-FPM pool configuration
 COPY ./docker/php/www.conf /usr/local/etc/php-fpm.d/zz-custom.conf
 
+# Copy logrotate configuration for Laravel logs
+COPY ./docker/php/logrotate-laravel /etc/logrotate.d/laravel
+
+# Copy start script
+COPY ./docker/php/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# Set up cron job for logrotate (runs hourly)
+RUN echo "0 * * * * root /usr/sbin/logrotate /etc/logrotate.d/laravel" > /etc/cron.d/logrotate-laravel && chmod 0644 /etc/cron.d/logrotate-laravel
+
 # Expose port 9000 and start php-fpm server
 EXPOSE 9000
-CMD ["php-fpm"]
-
+CMD ["/usr/local/bin/start.sh"]
